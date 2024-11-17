@@ -3,7 +3,6 @@ package com.zyf.zojcodesandbox.controller;
 import com.zyf.zojcodesandbox.JavaCodeSandboxTemplate;
 import com.zyf.zojcodesandbox.model.ExecuteCodeRequest;
 import com.zyf.zojcodesandbox.model.ExecuteCodeResponse;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;

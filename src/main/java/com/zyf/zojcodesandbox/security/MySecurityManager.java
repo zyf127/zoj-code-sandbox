@@ -1,6 +1,5 @@
 package com.zyf.zojcodesandbox.security;
 
-import java.io.FileDescriptor;
 import java.security.Permission;
 
 public class MySecurityManager extends SecurityManager {

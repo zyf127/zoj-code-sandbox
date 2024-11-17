@@ -1,6 +1,5 @@
 package com.zyf.zojcodesandbox;
 
-import cn.hutool.core.util.ArrayUtil;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.async.ResultCallback;
 import com.github.dockerjava.api.command.*;
@@ -12,9 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StopWatch;
 
-import java.io.Closeable;
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -29,6 +26,8 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
     private static final String DOCKER_VOLUME = "/app";
 
     private static final long TIME_OUT = 5 * 1000L;
+
+    private static final double MEMORY_UNIT = 1024.0 * 1024.0;
 
     @Override
     protected List<ExecuteMessage> runFile(List<String> inputList, File userCodeFile) {
@@ -71,12 +70,13 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
         // 启动容器
         dockerClient.startContainerCmd(containerId).exec();
         // 在容器中运行Java代码
-        // 执行docker命令：docker exec optimistic_neumann java -cp /app Main 1 3
+        // 执行docker命令：docker exec -it heuristic_burnell /bin/sh -c "java -cp /app Main < /app/input.txt"
         List<ExecuteMessage> executeMessageList = new ArrayList<>();
-        for (String inputArgs : inputList) {
+        for (int i = 0; i < inputList.size(); i++) {
             StopWatch stopWatch = new StopWatch();
-            String[] inputArgsArray = inputArgs.split(" ");
-            String[] cmdArray = ArrayUtil.append(new String[]{"java", "-cp", DOCKER_VOLUME, "Main"}, inputArgsArray);
+            String inputPath = DOCKER_VOLUME + "/input" + (i + 1) + ".txt";
+            String javaCmd = "java -cp " + DOCKER_VOLUME + " Main < " + inputPath;
+            String[] cmdArray = new String[]{"/bin/sh", "-c", javaCmd};
             ExecCreateCmdResponse execCreateCmdResponse = dockerClient.execCreateCmd(containerId)
                     .withCmd(cmdArray)
                     .withAttachStdin(true)
@@ -93,17 +93,19 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
                     if (StreamType.STDERR.equals(streamType)) {
                         executeMessage.setErrorMessage(new String(frame.getPayload()));
                     } else {
-                        executeMessage.setMessage(new String(frame.getPayload()));
+                        String message = new String(frame.getPayload());
+                        String handleMessage = message.replace("\n", " ").trim();
+                        executeMessage.setMessage(handleMessage);
                     }
                     super.onNext(frame);
                 }
             };
             // 获取占用内存
-            final long[] maxMemoryArray = {0L};
+            final double[] maxMemoryArray = {0.0};
             ResultCallback<Statistics> statisticsResultCallback = new ResultCallback<Statistics>() {
                 @Override
                 public void onNext(Statistics statistics) {
-                    maxMemoryArray[0] = Math.max(statistics.getMemoryStats().getUsage(), maxMemoryArray[0]);
+                    maxMemoryArray[0] = Math.max(statistics.getMemoryStats().getUsage() / MEMORY_UNIT, maxMemoryArray[0]);
                 }
 
                 @Override

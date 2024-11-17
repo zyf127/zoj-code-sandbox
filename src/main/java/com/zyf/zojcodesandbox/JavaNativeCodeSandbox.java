@@ -20,7 +20,7 @@ public class JavaNativeCodeSandbox extends JavaCodeSandboxTemplate {
         String userCodeParentPath = userCodeFile.getParentFile().getAbsolutePath();
         List<ExecuteMessage> executeMessageList = new ArrayList<>();
         for (String inputArgs : inputList) {
-            String runCmd = String.format("java -Xmx256m -Dfile.encoding=UTF-8 -cp %s Main %s", userCodeParentPath, inputArgs);
+            String runCmd = String.format("java -Xmx256m -Dfile.encoding=UTF-8 -cp %s Main", userCodeParentPath);
             try {
                 Process runProcess = Runtime.getRuntime().exec(runCmd);
                 // 超时控制
@@ -34,7 +34,7 @@ public class JavaNativeCodeSandbox extends JavaCodeSandboxTemplate {
                         throw new RuntimeException(e);
                     }
                 }).start();
-                ExecuteMessage runMessage = ProcessUtils.runProcess(runProcess);
+                ExecuteMessage runMessage = ProcessUtils.getAcmProcessMessage(runProcess, inputArgs);
                 executeMessageList.add(runMessage);
             } catch (IOException | InterruptedException e) {
                 log.error("程序运行异常：" + e);

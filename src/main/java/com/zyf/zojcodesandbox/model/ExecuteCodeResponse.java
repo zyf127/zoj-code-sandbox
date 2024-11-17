@@ -1,6 +1,5 @@
 package com.zyf.zojcodesandbox.model;
 
-import com.zyf.zojcodesandbox.JudgeInfo;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

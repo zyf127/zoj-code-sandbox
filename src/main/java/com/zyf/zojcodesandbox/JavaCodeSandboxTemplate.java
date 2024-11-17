@@ -5,11 +5,14 @@ import cn.hutool.core.util.StrUtil;
 import com.zyf.zojcodesandbox.model.ExecuteCodeRequest;
 import com.zyf.zojcodesandbox.model.ExecuteCodeResponse;
 import com.zyf.zojcodesandbox.model.ExecuteMessage;
+import com.zyf.zojcodesandbox.model.JudgeInfo;
 import com.zyf.zojcodesandbox.utils.ProcessUtils;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,8 +32,8 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
         List<String> inputList = executeCodeRequest.getInputList();
         String code = executeCodeRequest.getCode();
 
-        // 1. 把用户的代码保存为文件
-        File userCodeFile = saveCodeToFile(code);
+        // 1. 把用户代码和输入用例保存为文件
+        File userCodeFile = saveCodeAndInputCaseToFile(code, inputList);
 
         // 2. 编译.java文件，得到.class文件
         ExecuteMessage compileMessage = compileFile(userCodeFile);
@@ -50,12 +53,12 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
     }
 
     /**
-     * 1. 把用户的代码保存为文件
+     * 1. 把用户的代码和输入用例保存为文件
      *
      * @param code
      * @return
      */
-    protected File saveCodeToFile(String code) {
+    protected File saveCodeAndInputCaseToFile(String code, List<String> inputList) {
 
         String userDir = System.getProperty(USER_DIR);
         String globalCodePathName = userDir + File.separator + GLOBAL_CODE_DIR_NAME;
@@ -64,7 +67,25 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
         }
         String userCodeParentPath = globalCodePathName + File.separator + UUID.randomUUID();
         String userCodePath = userCodeParentPath + File.separator + GLOBAL_JAVA_CLASS_NAME;
-        return FileUtil.writeString(code, userCodePath, StandardCharsets.UTF_8);
+        File userCodeFile = FileUtil.writeString(code, userCodePath, StandardCharsets.UTF_8);
+        // 保存每个输入用例到文件中（1个输入用例对应1个文件）
+        for (int i = 0; i < inputList.size(); i++) {
+            String inputCasePath = userCodeParentPath + File.separator + "input" + (i + 1) + ".txt";
+            File inputCaseFile = FileUtil.newFile(inputCasePath);
+            try {
+                PrintStream printStream = new PrintStream(inputCaseFile);
+                String inputCase = inputList.get(i);
+                String[] inputCaseArgsArray = inputCase.split(" ");
+                for (String inputCaseArgs : inputCaseArgsArray) {
+                    printStream.println(inputCaseArgs);
+                }
+                printStream.close();
+            } catch (FileNotFoundException e) {
+                log.error("输入用例写入文件异常：", e);
+                throw new RuntimeException("输入用例写入文件异常", e);
+            }
+        }
+        return userCodeFile;
     }
 
     /**
@@ -104,7 +125,7 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
         ExecuteCodeResponse executeCodeResponse = new ExecuteCodeResponse();
         List<String> outputList = new ArrayList<>();
         long maxTime = 0L;
-        long maxMemory = 0L;
+        double maxMemory = 0.0;
         for (ExecuteMessage executeMessage : executeMessageList) {
             if (StrUtil.isNotBlank(executeMessage.getErrorMessage())) {
                 executeCodeResponse.setMessage(executeMessage.getErrorMessage());
@@ -113,7 +134,7 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
             }
             outputList.add(executeMessage.getMessage());
             Long time = executeMessage.getTime();
-            Long memory = executeMessage.getMemory();
+            Double memory = executeMessage.getMemory();
             if (time != null) {
                 maxTime = Math.max(maxTime, time);
             }

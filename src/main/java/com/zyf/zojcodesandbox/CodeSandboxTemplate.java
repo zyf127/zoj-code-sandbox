@@ -142,7 +142,7 @@ public abstract class CodeSandboxTemplate implements CodeSandbox {
         ExecuteCodeResponse executeCodeResponse = new ExecuteCodeResponse();
         List<String> outputList = new ArrayList<>();
         long maxTime = 0L;
-        double maxMemory = 0.0;
+        long maxMemory = 0L;
         for (ExecuteMessage executeMessage : executeMessageList) {
             if (StrUtil.isNotBlank(executeMessage.getErrorMessage())) {
                 executeCodeResponse.setMessage(executeMessage.getErrorMessage());
@@ -151,7 +151,7 @@ public abstract class CodeSandboxTemplate implements CodeSandbox {
             }
             outputList.add(executeMessage.getMessage());
             Long time = executeMessage.getTime();
-            Double memory = executeMessage.getMemory();
+            Long memory = executeMessage.getMemory();
             if (time != null) {
                 maxTime = Math.max(maxTime, time);
             }

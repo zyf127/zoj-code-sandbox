@@ -31,7 +31,7 @@ public class DockerCodeSandbox extends CodeSandboxTemplate {
 
     private static final long TIME_OUT = 5 * 1000L;
 
-    private static final double MEMORY_UNIT = 1024.0 * 1024.0;
+    private static final long MEMORY_UNIT = 1024L;
 
     @Override
     protected List<ExecuteMessage> runFile(String language, List<String> inputList, File userCodeFile) {
@@ -118,7 +118,7 @@ public class DockerCodeSandbox extends CodeSandboxTemplate {
                 }
             };
             // 获取占用内存
-            final double[] maxMemoryArray = {0.0};
+            final long[] maxMemoryArray = {0L};
             ResultCallback<Statistics> statisticsResultCallback = new ResultCallback<Statistics>() {
                 @Override
                 public void onNext(Statistics statistics) {
@@ -147,7 +147,7 @@ public class DockerCodeSandbox extends CodeSandboxTemplate {
                         .awaitCompletion(TIME_OUT, TimeUnit.MILLISECONDS);
                 stopWatch.stop();
                 executeMessage.setTime(stopWatch.getLastTaskTimeMillis());
-                executeMessage.setMemory(Double.parseDouble(String.format("%.2f", maxMemoryArray[0])));
+                executeMessage.setMemory(maxMemoryArray[0]);
             } catch (InterruptedException e) {
                 log.error("程序运行异常：" + e);
                 throw new RuntimeException("程序运行异常", e);

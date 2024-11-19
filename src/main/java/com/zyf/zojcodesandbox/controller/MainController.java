@@ -1,6 +1,6 @@
 package com.zyf.zojcodesandbox.controller;
 
-import com.zyf.zojcodesandbox.JavaCodeSandboxTemplate;
+import com.zyf.zojcodesandbox.CodeSandboxTemplate;
 import com.zyf.zojcodesandbox.model.ExecuteCodeRequest;
 import com.zyf.zojcodesandbox.model.ExecuteCodeResponse;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,7 +16,7 @@ import javax.servlet.http.HttpServletResponse;
 public class MainController {
 
     @Resource
-    private JavaCodeSandboxTemplate javaDockerCodeSandbox;
+    private CodeSandboxTemplate dockerCodeSandbox;
 
     // 定义鉴权请求头和密钥
     private static final String AUTH_REQUEST_HEADER = "auth";
@@ -35,6 +35,6 @@ public class MainController {
             response.setStatus(403);
             return new ExecuteCodeResponse();
         }
-        return javaDockerCodeSandbox.executeCode(executeCodeRequest);
+        return dockerCodeSandbox.executeCode(executeCodeRequest);
     }
 }

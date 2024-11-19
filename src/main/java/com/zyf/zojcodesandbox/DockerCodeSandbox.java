@@ -6,12 +6,14 @@ import com.github.dockerjava.api.command.*;
 import com.github.dockerjava.api.model.*;
 import com.github.dockerjava.core.DockerClientBuilder;
 import com.github.dockerjava.core.command.ExecStartResultCallback;
+import com.zyf.zojcodesandbox.enums.QuestionSubmitLanguageEnum;
 import com.zyf.zojcodesandbox.model.ExecuteMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StopWatch;
 
 import java.io.*;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -19,9 +21,11 @@ import java.util.concurrent.TimeUnit;
 
 @Component
 @Slf4j
-public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
+public class DockerCodeSandbox extends CodeSandboxTemplate {
 
-    private static final String IMAGE_NAME = "openjdk:8-alpine";
+    private static final String JAVA_IMAGE_NAME = "openjdk:8-alpine";
+
+    private static final String CPP_IMAGE_NAME = "gcc:7";
 
     private static final String DOCKER_VOLUME = "/app";
 
@@ -30,13 +34,20 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
     private static final double MEMORY_UNIT = 1024.0 * 1024.0;
 
     @Override
-    protected List<ExecuteMessage> runFile(List<String> inputList, File userCodeFile) {
+    protected List<ExecuteMessage> runFile(String language, List<String> inputList, File userCodeFile) {
         DockerClient dockerClient = DockerClientBuilder.getInstance().build();
+        String imageName = null;
+        if (QuestionSubmitLanguageEnum.CPLUSPLUS.getValue().equals(language)) {
+            imageName = CPP_IMAGE_NAME;
+        } else {
+            imageName = JAVA_IMAGE_NAME;
+        }
         // 拉取镜像（如果镜像不存在的话）
         List<Image> imageList = dockerClient.listImagesCmd().exec();
-        boolean isImageExists = imageList.stream().anyMatch(image -> image.getRepoTags() != null && Arrays.asList(image.getRepoTags()).contains(IMAGE_NAME));
+        String finalImageName = imageName;
+        boolean isImageExists = imageList.stream().anyMatch(image -> image.getRepoTags() != null && Arrays.asList(image.getRepoTags()).contains(finalImageName));
         if (!isImageExists) {
-            PullImageCmd pullImageCmd = dockerClient.pullImageCmd(IMAGE_NAME);
+            PullImageCmd pullImageCmd = dockerClient.pullImageCmd(imageName);
             PullImageResultCallback pullImageResultCallback = new PullImageResultCallback() {
                 @Override
                 public void onNext(PullResponseItem item) {
@@ -56,7 +67,7 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
         hostConfig.withMemorySwap(0L);
         hostConfig.withCpuCount(1L);
         hostConfig.setBinds(new Bind(userCodeFile.getParentFile().getAbsolutePath(), new Volume(DOCKER_VOLUME)));
-        CreateContainerCmd containerCmd = dockerClient.createContainerCmd(IMAGE_NAME);
+        CreateContainerCmd containerCmd = dockerClient.createContainerCmd(imageName);
         CreateContainerResponse createContainerResponse = containerCmd
                 .withHostConfig(hostConfig)
                 .withNetworkDisabled(true)
@@ -69,14 +80,21 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
         String containerId = createContainerResponse.getId();
         // 启动容器
         dockerClient.startContainerCmd(containerId).exec();
-        // 在容器中运行Java代码
-        // 执行docker命令：docker exec -it heuristic_burnell /bin/sh -c "java -cp /app Main < /app/input.txt"
+        // 在容器中运行代码
+        // 执行docker命令（Java）：docker exec -it heuristic_burnell /bin/sh -c "java -cp /app Main < /app/input.txt"
+        // 执行docker命令（C++）：docker exec -it sleepy_proskuriakova /bin/bash -c "/app/main < /app/input.txt"
         List<ExecuteMessage> executeMessageList = new ArrayList<>();
         for (int i = 0; i < inputList.size(); i++) {
             StopWatch stopWatch = new StopWatch();
             String inputPath = DOCKER_VOLUME + "/input" + (i + 1) + ".txt";
-            String javaCmd = "java -cp " + DOCKER_VOLUME + " Main < " + inputPath;
-            String[] cmdArray = new String[]{"/bin/sh", "-c", javaCmd};
+            String[] cmdArray = null;
+            if (QuestionSubmitLanguageEnum.CPLUSPLUS.getValue().equals(language)) {
+                String cppCmd = DOCKER_VOLUME + "/main < " + inputPath;
+                cmdArray = new String[]{"/bin/bash", "-c", cppCmd};
+            } else {
+                String javaCmd = "java -cp " + DOCKER_VOLUME + " Main < " + inputPath;
+                cmdArray = new String[]{"/bin/sh", "-c", javaCmd};
+            }
             ExecCreateCmdResponse execCreateCmdResponse = dockerClient.execCreateCmd(containerId)
                     .withCmd(cmdArray)
                     .withAttachStdin(true)
@@ -94,8 +112,7 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
                         executeMessage.setErrorMessage(new String(frame.getPayload()));
                     } else {
                         String message = new String(frame.getPayload());
-                        String handleMessage = message.replace("\n", " ").trim();
-                        executeMessage.setMessage(handleMessage);
+                        executeMessage.setMessage(message.trim());
                     }
                     super.onNext(frame);
                 }
@@ -130,7 +147,7 @@ public class JavaDockerCodeSandbox extends JavaCodeSandboxTemplate {
                         .awaitCompletion(TIME_OUT, TimeUnit.MILLISECONDS);
                 stopWatch.stop();
                 executeMessage.setTime(stopWatch.getLastTaskTimeMillis());
-                executeMessage.setMemory(maxMemoryArray[0]);
+                executeMessage.setMemory(Double.parseDouble(String.format("%.2f", maxMemoryArray[0])));
             } catch (InterruptedException e) {
                 log.error("程序运行异常：" + e);
                 throw new RuntimeException("程序运行异常", e);

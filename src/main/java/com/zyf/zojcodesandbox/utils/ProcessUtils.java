@@ -10,23 +10,23 @@ import java.io.*;
  */
 public class ProcessUtils {
     /**
-     * 执行进程
+     * 执行编译文件进程
      *
-     * @param process
+     * @param compileProcess
      * @return
      */
-    public static ExecuteMessage runProcess(Process process) throws InterruptedException, IOException {
+    public static ExecuteMessage compileFileProcess(Process compileProcess) throws InterruptedException, IOException {
         ExecuteMessage executeMessage = new ExecuteMessage();
         // StopWatch用于获取程序运行时间
         StopWatch stopWatch = new StopWatch();
         stopWatch.start();
         // 等待程序执行，获取响应码
-        int exitValue = process.waitFor();
+        int exitValue = compileProcess.waitFor();
         executeMessage.setExitValue(exitValue);
         if (exitValue == 0) {
             // 正常退出
             // 分批获取进程的正常输出
-            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(compileProcess.getInputStream()));
             // 逐行读取
             String line;
             StringBuilder stringBuilder = new StringBuilder();
@@ -37,7 +37,7 @@ public class ProcessUtils {
         } else {
             // 异常退出
             // 分批获取进程的正常输出
-            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(compileProcess.getInputStream()));
             // 逐行读取
             String line;
             StringBuilder stringBuilder = new StringBuilder();
@@ -47,7 +47,7 @@ public class ProcessUtils {
             executeMessage.setMessage(stringBuilder.toString());
 
             // 分批获取进程的错误输出
-            BufferedReader errorBufferedReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
+            BufferedReader errorBufferedReader = new BufferedReader(new InputStreamReader(compileProcess.getErrorStream()));
             // 逐行读取
             String errorLine;
             StringBuilder errorStringBuilder = new StringBuilder();
@@ -59,7 +59,7 @@ public class ProcessUtils {
         stopWatch.stop();
         long lastTaskTimeMillis = stopWatch.getLastTaskTimeMillis();
         executeMessage.setTime(lastTaskTimeMillis);
-        process.destroy();
+        compileProcess.destroy();
         return executeMessage;
     }
 
@@ -72,7 +72,7 @@ public class ProcessUtils {
      * @throws InterruptedException
      * @throws IOException
      */
-    public static ExecuteMessage getAcmProcessMessage(Process runProcess, String inputArgs) throws InterruptedException, IOException {
+    public static ExecuteMessage runFileProcess(Process runProcess, String inputArgs) throws InterruptedException, IOException {
         StringReader inputReader = new StringReader(inputArgs);
         BufferedReader inputBufferedReader = new BufferedReader(inputReader);
 

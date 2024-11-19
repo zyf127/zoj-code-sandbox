@@ -2,6 +2,7 @@ package com.zyf.zojcodesandbox;
 
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
+import com.zyf.zojcodesandbox.enums.QuestionSubmitLanguageEnum;
 import com.zyf.zojcodesandbox.model.ExecuteCodeRequest;
 import com.zyf.zojcodesandbox.model.ExecuteCodeResponse;
 import com.zyf.zojcodesandbox.model.ExecuteMessage;
@@ -19,27 +20,30 @@ import java.util.List;
 import java.util.UUID;
 
 @Slf4j
-public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
+public abstract class CodeSandboxTemplate implements CodeSandbox {
     private static final String USER_DIR = "user.dir";
 
     private static final String GLOBAL_CODE_DIR_NAME = "tempCode";
 
-    private static final String GLOBAL_JAVA_CLASS_NAME = "Main.java";
+    private static final String GLOBAL_JAVA_FILE_NAME = "Main.java";
+
+    private static final String GLOBAL_CPP_FILE_NAME = "main.cpp";
 
     @Override
     public ExecuteCodeResponse executeCode(ExecuteCodeRequest executeCodeRequest) {
 
         List<String> inputList = executeCodeRequest.getInputList();
         String code = executeCodeRequest.getCode();
+        String language = executeCodeRequest.getLanguage();
 
         // 1. 把用户代码和输入用例保存为文件
-        File userCodeFile = saveCodeAndInputCaseToFile(code, inputList);
+        File userCodeFile = saveCodeAndInputCaseToFile(language, code, inputList);
 
-        // 2. 编译.java文件，得到.class文件
+        // 2. 编译文件
         ExecuteMessage compileMessage = compileFile(userCodeFile);
 
-        // 3. 运行.class文件，得到输出结果
-        List<ExecuteMessage> executeMessageList = runFile(inputList, userCodeFile);
+        // 3. 运行编译后的文件
+        List<ExecuteMessage> executeMessageList = runFile(language, inputList, userCodeFile);
 
         // 4. 整理输出结果
         ExecuteCodeResponse executeCodeResponse = getOutputResponse(executeMessageList);
@@ -55,10 +59,12 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
     /**
      * 1. 把用户的代码和输入用例保存为文件
      *
+     * @param language
      * @param code
+     * @param inputList
      * @return
      */
-    protected File saveCodeAndInputCaseToFile(String code, List<String> inputList) {
+    protected File saveCodeAndInputCaseToFile(String language, String code, List<String> inputList) {
 
         String userDir = System.getProperty(USER_DIR);
         String globalCodePathName = userDir + File.separator + GLOBAL_CODE_DIR_NAME;
@@ -66,7 +72,12 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
             FileUtil.mkdir(globalCodePathName);
         }
         String userCodeParentPath = globalCodePathName + File.separator + UUID.randomUUID();
-        String userCodePath = userCodeParentPath + File.separator + GLOBAL_JAVA_CLASS_NAME;
+        String userCodePath = null;
+        if (QuestionSubmitLanguageEnum.CPLUSPLUS.getValue().equals(language)) {
+            userCodePath = userCodeParentPath + File.separator + GLOBAL_CPP_FILE_NAME;
+        } else {
+            userCodePath = userCodeParentPath + File.separator + GLOBAL_JAVA_FILE_NAME;
+        }
         File userCodeFile = FileUtil.writeString(code, userCodePath, StandardCharsets.UTF_8);
         // 保存每个输入用例到文件中（1个输入用例对应1个文件）
         for (int i = 0; i < inputList.size(); i++) {
@@ -75,10 +86,7 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
             try {
                 PrintStream printStream = new PrintStream(inputCaseFile);
                 String inputCase = inputList.get(i);
-                String[] inputCaseArgsArray = inputCase.split(" ");
-                for (String inputCaseArgs : inputCaseArgsArray) {
-                    printStream.println(inputCaseArgs);
-                }
+                printStream.println(inputCase);
                 printStream.close();
             } catch (FileNotFoundException e) {
                 log.error("输入用例写入文件异常：", e);
@@ -89,16 +97,24 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
     }
 
     /**
-     * 2. 编译.java文件，得到.class文件
+     * 2. 编译文件
      *
      * @param userCodeFile
      * @return
      */
     protected ExecuteMessage compileFile(File userCodeFile) {
-        String compileCmd = String.format("javac -encoding UTF-8 %s", userCodeFile.getAbsolutePath());
+        String suffix = FileUtil.getSuffix(userCodeFile);
+        String compileCmd = null;
+        String userCodeAbsolutePath = userCodeFile.getAbsolutePath();
+        if ("cpp".equals(suffix)) {
+            compileCmd = String.format("g++ -finput-charset=UTF-8 -fexec-charset=UTF-8 %s -o %s", userCodeAbsolutePath,
+                    userCodeAbsolutePath.substring(0, userCodeAbsolutePath.length() - 4));
+        } else {
+            compileCmd = String.format("javac -encoding UTF-8 %s", userCodeAbsolutePath);
+        }
         try {
             Process complieProcess = Runtime.getRuntime().exec(compileCmd);
-            ExecuteMessage compileMessage = ProcessUtils.runProcess(complieProcess);
+            ExecuteMessage compileMessage = ProcessUtils.compileFileProcess(complieProcess);
             return compileMessage;
         } catch (IOException | InterruptedException e) {
             log.error("程序编译异常：", e);
@@ -107,13 +123,14 @@ public abstract class JavaCodeSandboxTemplate implements CodeSandbox {
     }
 
     /**
-     * 3. 运行.class文件，得到输出结果
-     *
+     * 3. 运行编译后的文件
+     * 
+     * @param language
      * @param inputList
      * @param userCodeFile
      * @return
      */
-    protected abstract List<ExecuteMessage> runFile(List<String> inputList, File userCodeFile);
+    protected abstract List<ExecuteMessage> runFile(String language, List<String> inputList, File userCodeFile);
 
     /**
      * 4. 整理输出结果

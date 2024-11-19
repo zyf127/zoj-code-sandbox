@@ -12,11 +12,11 @@ import java.util.List;
 
 @Component
 @Slf4j
-public class JavaNativeCodeSandbox extends JavaCodeSandboxTemplate {
+public class NativeCodeSandbox extends CodeSandboxTemplate {
     private  static final long TIME_OUT = 5 * 1000L;
 
     @Override
-    protected List<ExecuteMessage> runFile(List<String> inputList, File userCodeFile) {
+    protected List<ExecuteMessage> runFile(String lanuage, List<String> inputList, File userCodeFile) {
         String userCodeParentPath = userCodeFile.getParentFile().getAbsolutePath();
         List<ExecuteMessage> executeMessageList = new ArrayList<>();
         for (String inputArgs : inputList) {
@@ -34,7 +34,7 @@ public class JavaNativeCodeSandbox extends JavaCodeSandboxTemplate {
                         throw new RuntimeException(e);
                     }
                 }).start();
-                ExecuteMessage runMessage = ProcessUtils.getAcmProcessMessage(runProcess, inputArgs);
+                ExecuteMessage runMessage = ProcessUtils.runFileProcess(runProcess, inputArgs);
                 executeMessageList.add(runMessage);
             } catch (IOException | InterruptedException e) {
                 log.error("程序运行异常：" + e);
